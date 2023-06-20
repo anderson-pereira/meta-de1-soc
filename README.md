@@ -1,75 +1,181 @@
 # OpenEmbedded/Yocto BSP layer for Altera DE1-SoC
 - BSP layer based on:
-	- [meta-altera](https://github.com/kraj/meta-altera)
-	- [meta-intelfpga](https://github.com/robseb/meta-intelfpga.git)
+    - [meta-altera](https://github.com/kraj/meta-altera)
+    - [meta-intelfpga](https://github.com/robseb/meta-intelfpga.git)
 
-## Environment proposal
+## **Environment proposal**
 
-- **Creating directory tree**
+- Creating directory tree
+    ```Bash
+    mkdir -p ~/Projects/Yocto/shared/downloads
+    mkdir -p ~/Projects/Yocto/shared/sstate-cache
+    mkdir -p ~/Projects/Yocto/Builds/DE1SoC
+
+    cd ~/Projects/Yocto/Builds/DE1SoC && \
+        git clone --branch kirkstone git://git.yoctoproject.org/poky.git
+
+    cd ~/Projects/Yocto/Builds/DE1SoC/poky && \
+        git clone https://github.com/anderson-pereira/meta-de1-soc.git
+    ```
+
+- Directories Overview
+    ```Bash
+    tree ~/Projects/Yocto/
+    ├── shared
+    │   ├── downloads
+    │   └── sstate-cache
+    └── Builds
+    └── DE1SoC
+        ├── build
+        └── poky
+            ├── meta-de1-soc
+            ├── meta-poky
+            └── ...
+    ```
+
+## **Configurations and first build**
+
+- Starting build environment
+    ```Bash
+    docker run -it --rm \
+        --volume ~/Projects/Yocto/shared/downloads:/yocto/downloads \
+        --volume ~/Projects/Yocto/shared/sstate-cache:/yocto/sstate-cache \
+        --volume ~/Projects/Yocto/Builds/DE1SoC:/yocto/DE1SoC \
+        --name=yocto-build-container \
+        --workdir=/yocto/DE1SoC \
+        --user=$UID \
+        andersonazevedo/yocto-build-env \
+        bash
+    ```
+
+- Inside docker container, start with Yocto build environment:
 	```Bash
-	mkdir -p ~/Projects/Yocto/shared/downloads
-	mkdir -p ~/Projects/Yocto/shared/sstate-cache
-	mkdir -p ~/Projects/Yocto/Builds/DE1SoC
-
-	cd ~/Projects/Yocto/Builds/DE1SoC && \
-		git clone --branch kirkstone git://git.yoctoproject.org/poky.git
-
-	cd ~/Projects/Yocto/Builds/DE1SoC/poky && \
-		git clone https://github.com/anderson-pereira/meta-de1-soc.git
+	cd /yocto/DE1SoC
+	source poky/oe-init-build-env build
 	```
 
-- **Directories Overview**
+	After that, ~/Projects/Yocto/Builds/DE1SoC/build directory will be created in your host containing all configuration and temporary files for this build (config/local.conf, config/bblayers.conf):
+
+- Add some base configurations in config/local.conf:
 	```Bash
-	tree ~/Projects/Yocto/
-	├── shared
-	│	├── downloads
-	│   └── sstate-cache
-	└── Builds
-		└── DE1SoC
-			├── build
-			└── poky
-				├── meta-de1-soc
-				├── meta-poky
-				└── ...
-	```
-- **Starting build enviroment**
-	```Bash
-	docker run -it --rm \
-		--volume ~/Projects/Yocto/shared/downloads:/yocto/downloads \
-		--volume ~/Projects/Yocto/shared/sstate-cache:/yocto/sstate-cache \
-		--volume ~/Projects/Yocto/Builds/DE1SoC:/yocto/DE1SoC \
-		--name=yocto-build-container \
-		--workdir=/yocto/DE1SoC \
-		--user=$UID \
-		andersonazevedo/yocto-build-env \
-		bash
+	MACHINE = "de1-soc"
+	IMAGE_INSTALL:append = " readbridgesfpga writebridgefpga writeconfigfpga "
+	DL_DIR = "/yocto/downloads"
+	SSTATE_DIR = "/yocto/sstate-cache"
 	```
 
-- **Configurations and first build**
-	- Inside docker container, start with Yocto build environment:
-		```Bash
-		cd /yocto/DE1SoC
-		source poky/oe-init-build-env build
-		```
-	- Add some base configurations in config/local.conf:
-		```Bash
-		MACHINE = "de1-soc"
-		IMAGE_INSTALL:append = " readbridgesfpga writebridgefpga writeconfigfpga "
-		DL_DIR = "/yocto/downloads"
-		SSTATE_DIR = "/yocto/sstate-cache"
-		```
-	- Add meta-de1-soc layer in config/bblayers.conf:
-		```Bash
-		BBLAYERS ?= " \
-		/yocto/DE1SoC/poky/meta \
-		/yocto/DE1SoC/poky/meta-poky \
-		/yocto/DE1SoC/poky/meta-yocto-bsp \
-		/yocto/DE1SoC/poky/meta-de1-soc \
-		"
-		```
-	- Run the first build (and go grab a coffee):
-		```Bash
-		bitbake core-image-full-cmdline
-		```
+- Add meta-de1-soc layer in config/bblayers.conf:
+	```Bash
+	BBLAYERS ?= " \
+	/yocto/DE1SoC/poky/meta \
+	/yocto/DE1SoC/poky/meta-poky \
+	/yocto/DE1SoC/poky/meta-yocto-bsp \
+	/yocto/DE1SoC/poky/meta-de1-soc \
+	"
+	```
 
+- Run the first build (and go grab a coffee):
+	```Bash
+	bitbake core-image-full-cmdline
+	```
+	The generated SDCard image can be found in `Projects/Yocto/Builds/DE1SoC/build/tmp/deploy/images/de1-soc/core-image-full-cmdline-de1-soc.wic`.
 
+# Development skills
+
+## **TFTP Boot**
+TFTP Boot is most used in cases of kernel and device-tree development, preventing to repetitives copies of files to SDCards.
+
+### Host configuration
+- Install TFTP requirements in host
+	```Bash
+	sudo apt-get update && sudo apt-get install xinetd tftpd tftp
+	sudo mkdir /tftpboot/
+	sudo chmod -R 777 /tftpboot/
+	sudo chown -R nobody /tftpboot/
+	```
+
+- Edit `/etc/xinetd.d/tftp` file:
+	```Bash
+	service tftp
+	{
+		protocol = udp
+		port = 69
+		socket_type = dgram
+		wait = yes
+		user = nobody
+		server = /usr/sbin/in.tftpd
+		server_args = /tftpboot
+		disable = no
+	}
+	```
+
+- Restarting the service
+	```Bash
+	sudo service xinetd restart
+	```
+
+	Now, you can copy `zImage` and `socfpga_cyclone5_socdk.dtb` files from `build/tmp/deploy/images/de1-soc/` directory to `/tftpboot` and use its with U-Boot. In your case, `socfpga_cyclone5_socdk.dtb` needs to be renamed to `socfpga.dtb` in `/tftpboot` directory.
+
+### U-Boot side
+
+- Let's first define some environment variables:
+	```Bash
+	setenv ipaddr <DE1SoC IP Addr to beused>
+	setenv ethaddr 62:c9:03:2d:e8:aa #DE1-SoC MAC
+	setenv gatewayip <your gateway IP>
+	setenv serverip <your host IP>
+	setenv tftpload 'tftp ${loadaddr} ${bootimage};tftp ${fdtaddr} ${fdtimage}'
+	saveenv
+	```
+
+- To load `zImage` and `socfpga_cyclone5_socdk.dtb` files stored in `/tftpboot` directory on host, run:
+	```Bash
+	run tftpload
+	run mmcboot
+	```
+
+	Now, the kernel and device-tree will be loaded and started. The rootfs used will be as defined in `mmcroot` environment variable, default value is `/dev/mmcblk0p3`.
+
+## **Network File System (NFS)**
+### Host configuration
+- Install NFS requirements in host
+	```Bash
+	sudo apt-get install nfs-kernel-server rpcbind
+	sudo mkdir /nfs
+	```
+
+- Edit `/etc/exports` file:
+	```Bash
+	/nfs *(rw,nohide,insecure,no_subtree_check,async,no_root_squash)
+	```
+
+- Edit `/etc/default/nfs-kernel-server` file:
+	```Bash
+	#RPCNFSDCOUNT=8
+	RPCNFSDCOUNT="--no-nfs-version 4"
+	```
+
+- Restarting the service
+	```Bash
+	sudo service nfs-kernel-server restart
+	sudo exportfs -a
+	```
+
+	Now, you can mount rootfs images on /nfs directory, like core-image-full-cmdline-de1-soc.ext3 generated by Yocto build in `build/tmp/deploy/images/de1-soc/` directory.
+
+	```Bash
+	sudo mount core-image-full-cmdline-de1-soc.ext3 /nfs
+	```
+
+### U-Boot side
+- Let's first define some environment variables:
+	```Bash
+	setenv tftpboot 'setenv bootargs console=ttyS0,115200 root=/dev/nfs ip=dhcp nfsroot=${serverip}:/nfs/,v3,tcp; run tftpload; bootz ${loadaddr} - ${fdtaddr}'
+	saveenv
+	```
+- With this environment variable above, `tftpload` will be used to load `zImage` and `socfpga.dtb` files from TFTP. `ǸFS` will be used by kernel when boots up. To start, just run:
+	```Bash
+	run tftpboot
+	```
+
+	Now, you can interact with `rootfs` running on DE1-SoC by editing `/nfs` directory in your host. All the system is running via network at this point, only U-Boot is used from SDCard.
