@@ -1,0 +1,50 @@
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+index 2e715a49700b..5281ded2424c 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
+@@ -10,8 +10,7 @@ / {
+ 	compatible = "altr,socfpga-cyclone5-socdk", "altr,socfpga-cyclone5", "altr,socfpga";
+ 
+ 	chosen {
+-		bootargs = "earlyprintk";
+-		stdout-path = "serial0:115200n8";
++		bootargs = "console=ttyS0,115200 root=/dev/mmcblk0p2 rw rootwait";
+ 	};
+ 
+ 	memory@0 {
+@@ -59,7 +58,7 @@ regulator_3_3v: 3-3-v-regulator {
+ };
+ 
+ &can0 {
+-	status = "okay";
++	status = "disabled";
+ };
+ 
+ &gmac1 {
+@@ -120,9 +119,6 @@ rtc@68 {
+ };
+ 
+ &mmc0 {
+-	cd-gpios = <&portb 18 0>;
+-	vmmc-supply = <&regulator_3_3v>;
+-	vqmmc-supply = <&regulator_3_3v>;
+ 	status = "okay";
+ };
+ 
+@@ -172,3 +168,15 @@ spidev@0 {
+ &usb1 {
+ 	status = "okay";
+ };
++
++&fpga_bridge0 {
++	status = "okay";
++};
++
++&fpga_bridge1 {
++	status = "okay";
++};
++
++&fpga_bridge2 {
++	status = "okay";
++};
+\ No newline at end of file
